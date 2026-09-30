@@ -14,7 +14,8 @@ per paese/città e per l'impronta giornaliera, e poi si scarta.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Dict, Optional
 
 from sqlalchemy import (
     BigInteger,
@@ -44,6 +45,12 @@ class Tabelle:
     utenti: Table
     giornaliero: Table
     impostazioni: Table
+    # v2: interpretazione AI, rapporti email, export verso strumenti esterni (Colab).
+    analisi: Optional[Table] = None
+    destinatari: Optional[Table] = None
+    invii: Optional[Table] = None
+    token: Optional[Table] = None
+    importati: Optional[Table] = None
 
 
 def _tabelle_v1(metadata: MetaData, prefisso: str, fk_utenti: str) -> Tabelle:
@@ -194,9 +201,94 @@ def _tabelle_v1(metadata: MetaData, prefisso: str, fk_utenti: str) -> Tabelle:
     return Tabelle(sali, sessioni, eventi, utenti, giornaliero, impostazioni)
 
 
+def _tabelle_v2_nuove(metadata: MetaData, prefisso: str, fk_utenti: str) -> Dict[str, Table]:
+    """Le tabelle aggiunte dalla v2 (la v1 resta com'è)."""
+    p = prefisso
+
+    def autore() -> Column:
+        return Column("creato_da", BigInteger, ForeignKey(fk_utenti, ondelete="SET NULL"), nullable=True)
+
+    analisi = Table(
+        f"{p}analisi_ai",
+        metadata,
+        Column("id", Uuid, primary_key=True),
+        #: La sezione analizzata (traffico, utenti, ricavi, … o «vista» per l'Esploratore).
+        Column("sezione", String(40), nullable=False),
+        #: Periodo e interrogazione: abbastanza per rifare la stessa analisi.
+        Column("parametri", JSONB, nullable=False),
+        #: I fatti numerati (M1…) dati al modello: la base su cui si verifica ciò che ha scritto.
+        Column("fatti", JSONB, nullable=False),
+        #: La risposta validata (ogni voce con `verificato`).
+        Column("risposta", JSONB, nullable=True),
+        Column("errore", String(500), nullable=True),
+        Column("modello", String(120), nullable=True),
+        Column("durata_ms", Integer, nullable=True),
+        autore(),
+        #: Il giudizio di chi l'ha letta: 1 utile, -1 inutile.
+        Column("giudizio", Integer, nullable=True),
+        #: Cosa si è deciso di fare: rientra nel contesto dell'analisi successiva della stessa sezione.
+        Column("azione_adottata", String(1000), nullable=True),
+        Column("created_at", DateTime(timezone=True), server_default=ADESSO, nullable=False),
+        Index(f"ix_{p}analisi_ai_sezione_created", "sezione", "created_at"),
+    )
+    destinatari = Table(
+        f"{p}destinatari",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("email", String(320), nullable=False, unique=True),
+        Column("attivo", Boolean, nullable=False, server_default=text("true")),
+        Column("created_at", DateTime(timezone=True), server_default=ADESSO, nullable=False),
+    )
+    invii = Table(
+        f"{p}invii",
+        metadata,
+        Column("id", Uuid, primary_key=True),
+        Column("tipo", String(40), nullable=False),
+        Column("da", Date, nullable=False),
+        Column("a", Date, nullable=False),
+        Column("destinatari", JSONB, nullable=False),
+        Column("riuscito", Boolean, nullable=False),
+        Column("dettaglio", String(1000), nullable=True),
+        Column("manuale", Boolean, nullable=False, server_default=text("false")),
+        Column("created_at", DateTime(timezone=True), server_default=ADESSO, nullable=False),
+    )
+    token = Table(
+        f"{p}token_export",
+        metadata,
+        Column("id", Uuid, primary_key=True),
+        Column("nome", String(120), nullable=False),
+        #: sha256 del token: il token vero si mostra una volta sola, alla creazione.
+        Column("impronta", String(64), nullable=False, unique=True),
+        #: `esporta` (leggere le collezioni) e/o `importa` (rimandare risultati).
+        Column("ambiti", JSONB, nullable=False),
+        Column("scade_il", DateTime(timezone=True), nullable=False),
+        Column("revocato_il", DateTime(timezone=True), nullable=True),
+        Column("ultimo_uso", DateTime(timezone=True), nullable=True),
+        autore(),
+        Column("created_at", DateTime(timezone=True), server_default=ADESSO, nullable=False),
+    )
+    importati = Table(
+        f"{p}risultati_importati",
+        metadata,
+        Column("id", Uuid, primary_key=True),
+        Column("token_id", Uuid, ForeignKey(f"{p}token_export.id", ondelete="SET NULL"), nullable=True),
+        Column("titolo", String(200), nullable=False),
+        Column("descrizione", String(4000), nullable=True),
+        Column("colonne", JSONB, nullable=False),
+        Column("righe", JSONB, nullable=False),
+        Column("created_at", DateTime(timezone=True), server_default=ADESSO, nullable=False),
+    )
+    return {"analisi": analisi, "destinatari": destinatari, "invii": invii, "token": token, "importati": importati}
+
+
+def _tabelle_v2(metadata: MetaData, prefisso: str, fk_utenti: str) -> Tabelle:
+    base = _tabelle_v1(metadata, prefisso, fk_utenti)
+    return replace(base, **_tabelle_v2_nuove(metadata, prefisso, fk_utenti))
+
+
 def registra_tabelle(metadata: MetaData, *, prefisso: str = "an_", fk_utenti: str = "users.id") -> Tabelle:
     """Aggiunge le tabelle (versione corrente) al `MetaData` dell'applicazione e le restituisce.
 
     `fk_utenti` è la colonna a cui puntano i riferimenti agli utenti (`tabella.colonna`, intera).
     """
-    return _tabelle_v1(metadata, prefisso, fk_utenti)
+    return _tabelle_v2(metadata, prefisso, fk_utenti)

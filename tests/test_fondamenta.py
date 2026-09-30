@@ -138,7 +138,10 @@ def test_schema_senza_ip_e_con_brin():
     metadata = MetaData()
     Table("users", metadata, Column("id", BigInteger, primary_key=True))
     t = registra_tabelle(metadata)
-    colonne = {c.name for tab in metadata.tables.values() for c in tab.columns}
+    # Le tabelle che misurano le persone (i destinatari del rapporto hanno un'email: sono gli
+    # amministratori che lo ricevono, non i visitatori).
+    misura = (t.sali, t.sessioni, t.eventi, t.utenti, t.giornaliero)
+    colonne = {c.name for tab in misura for c in tab.columns}
     assert not {"ip", "indirizzo", "user_agent", "email"} & colonne
     ddl = [str(CreateIndex(i).compile(dialect=postgresql.dialect())) for i in t.eventi.indexes]
     assert any("USING brin" in d for d in ddl)

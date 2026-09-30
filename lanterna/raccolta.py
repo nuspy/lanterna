@@ -307,6 +307,18 @@ async def registra(sessione, tabelle: Tabelle, config: ConfigLanterna, lotto: Lo
     await sessione.execute(update(s).where(s.c.id == sessione_id).values(**valori))
 
     if utente_id is not None:
+        # Gli eventi di server dell'utente appena emessi senza sessione (l'iscrizione nasce prima che
+        # il browser mandi il primo lotto col token) si legano a questa sessione: così l'imbuto
+        # visita → iscrizione li vede nella stessa visita.
+        e = tabelle.eventi
+        await sessione.execute(
+            update(e)
+            .where(and_(
+                e.c.utente_id == utente_id, e.c.sessione_id.is_(None), e.c.origine == "server",
+                e.c.ts > adesso - timedelta(minutes=config.sessione_minuti),
+            ))
+            .values(sessione_id=sessione_id)
+        )
         await tocca_utente(sessione, tabelle, utente_id, adesso, esteso)
     return sessione_id
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy import BigInteger, Column, MetaData, Table
 
-from .schema import _tabelle_v1
+from .schema import _tabelle_v1, _tabelle_v2_nuove
 
 
 def _v1(prefisso: str, fk_utenti: str) -> list[Table]:
@@ -20,6 +20,28 @@ def _v1(prefisso: str, fk_utenti: str) -> list[Table]:
     t = _tabelle_v1(metadata, prefisso, fk_utenti)
     # In ordine di dipendenza: le sessioni prima degli eventi.
     return [t.sali, t.sessioni, t.eventi, t.utenti, t.giornaliero, t.impostazioni]
+
+
+def _v2_nuove(prefisso: str, fk_utenti: str) -> list[Table]:
+    metadata = MetaData()
+    nome, colonna = fk_utenti.split(".")
+    Table(nome, metadata, Column(colonna, BigInteger, primary_key=True))
+    t = _tabelle_v2_nuove(metadata, prefisso, fk_utenti)
+    return [t["analisi"], t["destinatari"], t["invii"], t["token"], t["importati"]]
+
+
+def crea_v2(op, *, prefisso: str = "an_", fk_utenti: str = "users.id") -> None:
+    """Da v1 a v2: le tabelle di analisi AI, rapporti, token e risultati importati."""
+    connessione = op.get_bind()
+    for tabella in _v2_nuove(prefisso, fk_utenti):
+        tabella.create(connessione)
+
+
+def elimina_v2(op, *, prefisso: str = "an_", fk_utenti: str = "users.id") -> None:
+    """Da v2 a v1."""
+    connessione = op.get_bind()
+    for tabella in reversed(_v2_nuove(prefisso, fk_utenti)):
+        tabella.drop(connessione)
 
 
 def crea_v1(op, *, prefisso: str = "an_", fk_utenti: str = "users.id") -> None:
