@@ -57,6 +57,10 @@ def test_numeri_nel_testo_formati_italiani():
     assert numeri_nel_testo("1.234,5 euro, +33,3% e 75.0% (M12)") == [1234.5, 33.3, 75.0]
 
 
+def test_le_date_non_sono_numeri_da_verificare():
+    assert numeri_nel_testo("Dalla campagna del 2026-09-20 (o 20/09) le visite sono 400.") == [400.0]
+
+
 def test_la_verifica_segnala_numeri_inventati_e_citazioni_false():
     fatti = Fatti()
     da_risultato(fatti, "Traffico", _risultato())

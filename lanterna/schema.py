@@ -51,6 +51,9 @@ class Tabelle:
     invii: Optional[Table] = None
     token: Optional[Table] = None
     importati: Optional[Table] = None
+    # v3: annotazioni sul calendario e obiettivi (conversioni) configurabili.
+    annotazioni: Optional[Table] = None
+    obiettivi: Optional[Table] = None
 
 
 def _tabelle_v1(metadata: MetaData, prefisso: str, fk_utenti: str) -> Tabelle:
@@ -286,9 +289,47 @@ def _tabelle_v2(metadata: MetaData, prefisso: str, fk_utenti: str) -> Tabelle:
     return replace(base, **_tabelle_v2_nuove(metadata, prefisso, fk_utenti))
 
 
+def _tabelle_v3_nuove(metadata: MetaData, prefisso: str, fk_utenti: str) -> Dict[str, Table]:
+    """Le tabelle aggiunte dalla v3."""
+    p = prefisso
+    annotazioni = Table(
+        f"{p}annotazioni",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        #: Il giorno (nel fuso del sito) e, per ciò che dura, l'ultimo giorno.
+        Column("giorno", Date, nullable=False, index=True),
+        Column("fine", Date, nullable=True),
+        #: campagna | rilascio | contenuto | prezzo | esterno | altro
+        Column("tipo", String(20), nullable=False, server_default=text("'altro'")),
+        Column("titolo", String(200), nullable=False),
+        Column("nota", String(1000), nullable=True),
+        Column("creato_da", BigInteger, ForeignKey(fk_utenti, ondelete="SET NULL"), nullable=True),
+        Column("created_at", DateTime(timezone=True), server_default=ADESSO, nullable=False),
+    )
+    obiettivi = Table(
+        f"{p}obiettivi",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("nome", String(120), nullable=False),
+        #: `evento` (un nome di evento) o `pagina` (un prefisso di percorso, più d'uno separati da virgola).
+        Column("tipo", String(10), nullable=False),
+        Column("valore", String(500), nullable=False),
+        #: Proprietà dell'evento da rispettare (solo `evento`), es. {"fase": "completata"}.
+        Column("proprieta", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+        Column("attivo", Boolean, nullable=False, server_default=text("true")),
+        Column("created_at", DateTime(timezone=True), server_default=ADESSO, nullable=False),
+    )
+    return {"annotazioni": annotazioni, "obiettivi": obiettivi}
+
+
+def _tabelle_v3(metadata: MetaData, prefisso: str, fk_utenti: str) -> Tabelle:
+    base = _tabelle_v2(metadata, prefisso, fk_utenti)
+    return replace(base, **_tabelle_v3_nuove(metadata, prefisso, fk_utenti))
+
+
 def registra_tabelle(metadata: MetaData, *, prefisso: str = "an_", fk_utenti: str = "users.id") -> Tabelle:
     """Aggiunge le tabelle (versione corrente) al `MetaData` dell'applicazione e le restituisce.
 
     `fk_utenti` è la colonna a cui puntano i riferimenti agli utenti (`tabella.colonna`, intera).
     """
-    return _tabelle_v2(metadata, prefisso, fk_utenti)
+    return _tabelle_v3(metadata, prefisso, fk_utenti)

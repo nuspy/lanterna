@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy import BigInteger, Column, MetaData, Table
 
-from .schema import _tabelle_v1, _tabelle_v2_nuove
+from .schema import _tabelle_v1, _tabelle_v2_nuove, _tabelle_v3_nuove
 
 
 def _v1(prefisso: str, fk_utenti: str) -> list[Table]:
@@ -41,6 +41,27 @@ def elimina_v2(op, *, prefisso: str = "an_", fk_utenti: str = "users.id") -> Non
     """Da v2 a v1."""
     connessione = op.get_bind()
     for tabella in reversed(_v2_nuove(prefisso, fk_utenti)):
+        tabella.drop(connessione)
+
+
+def _v3_nuove(prefisso: str, fk_utenti: str) -> list[Table]:
+    metadata = MetaData()
+    nome, colonna = fk_utenti.split(".")
+    Table(nome, metadata, Column(colonna, BigInteger, primary_key=True))
+    t = _tabelle_v3_nuove(metadata, prefisso, fk_utenti)
+    return [t["annotazioni"], t["obiettivi"]]
+
+
+def crea_v3(op, *, prefisso: str = "an_", fk_utenti: str = "users.id") -> None:
+    """Da v2 a v3: annotazioni e obiettivi."""
+    connessione = op.get_bind()
+    for tabella in _v3_nuove(prefisso, fk_utenti):
+        tabella.create(connessione)
+
+
+def elimina_v3(op, *, prefisso: str = "an_", fk_utenti: str = "users.id") -> None:
+    connessione = op.get_bind()
+    for tabella in reversed(_v3_nuove(prefisso, fk_utenti)):
         tabella.drop(connessione)
 
 

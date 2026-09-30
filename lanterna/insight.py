@@ -22,7 +22,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from .interroga import Risultato
 
 ADDITIVI = {"intero", "euro"}
-MAX_FATTI = 70
+MAX_FATTI = 90
 
 
 @dataclass
@@ -312,9 +312,14 @@ _NUMERO = re.compile(r"(?<![\w.,])[-+]?\d{1,3}(?:\.\d{3})+(?:,\d+)?(?![\w])|(?<!
 _CITAZIONE = re.compile(r"\bM\d{1,3}\b")
 
 
+_DATA = re.compile(r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b")
+
+
 def numeri_nel_testo(testo: str) -> List[float]:
+    """I numeri di un testo, escluse le citazioni (M12) e le date (2026-09-20, 20/09): una data non è
+    un dato da verificare."""
     uscita = []
-    for m in _NUMERO.finditer(_CITAZIONE.sub(" ", testo)):
+    for m in _NUMERO.finditer(_DATA.sub(" ", _CITAZIONE.sub(" ", testo))):
         grezzo = m.group(0).lstrip("+")
         if re.fullmatch(r"-?\d{1,3}(?:\.\d{3})+(?:,\d+)?", grezzo):
             grezzo = grezzo.replace(".", "").replace(",", ".")
