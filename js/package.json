@@ -1,0 +1,17 @@
+{
+  "name": "lanterna-osservatore",
+  "version": "0.1.0",
+  "description": "L'osservatore delle pagine di lanterna: pagine viste, tempo attivo, click e viste dichiarati nel markup, eventi personalizzati. Senza cookie, senza dipendenze.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": { "types": "./index.d.ts", "default": "./index.js" },
+    "./react": { "types": "./react.d.ts", "default": "./react.js" }
+  },
+  "files": ["index.js", "index.d.ts", "react.js", "react.d.ts"],
+  "sideEffects": false,
+  "peerDependencies": { "react": ">=18" },
+  "peerDependenciesMeta": { "react": { "optional": true } }
+}
