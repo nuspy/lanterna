@@ -92,7 +92,11 @@ export function avvia(opzioni) {
     if (!NOME_VALIDO.test(n)) return;
     const p = extra.p ?? paginaCorrente ?? percorsoAttuale();
     if (escluso(p)) return;
-    coda.push({ n, p, t: adesso(), ...extra });
+    // Le proprietà comuni (es. la piattaforma, la variante della pagina) vanno in ogni evento, pagine viste comprese;
+    // quelle dell'evento vincono a parità di nome.
+    const comuni = typeof o.proprieta === "function" ? o.proprieta(p) : o.proprieta;
+    const x = comuni && Object.keys(comuni).length ? { ...comuni, ...(extra.x ?? {}) } : extra.x;
+    coda.push({ n, p, t: adesso(), ...extra, ...(x ? { x } : {}) });
     if (coda.length >= o.maxInCoda) svuota();
   }
 

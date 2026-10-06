@@ -17,6 +17,9 @@ export interface Opzioni {
   token?: () => string | null | undefined;
   /** Misura anche i browser automatizzati (`navigator.webdriver`): solo per i test. */
   ancheAutomatizzati?: boolean;
+  /** Proprietà aggiunte a ogni evento, pagine viste comprese: fisse o calcolate dal percorso. Quelle dell'evento
+   *  vincono a parità di nome. Es. `(p) => ({ piattaforma: "web" })`. */
+  proprieta?: Record<string, Valore> | ((percorso: string) => Record<string, Valore> | undefined);
 }
 
 export interface Osservatore {
